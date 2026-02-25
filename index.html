@@ -3,21 +3,23 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Gambit Master Pro</title>
+    <title>Chess Excellence Trainer</title>
     <link rel="stylesheet" href="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.css">
     <style>
-        body { font-family: sans-serif; background: #1a1a1a; color: white; display: flex; flex-direction: column; align-items: center; margin: 0; touch-action: none; overflow: hidden; }
+        body { font-family: 'Segoe UI', sans-serif; background: #1a1a1a; color: white; display: flex; flex-direction: column; align-items: center; margin: 0; touch-action: none; overflow-x: hidden; }
         #board { width: 92vw; max-width: 380px; margin: 10px 0; border: 3px solid #444; }
         .controls { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; width: 92vw; max-width: 380px; margin-top: 10px; }
-        button { padding: 12px 5px; background: #34495e; color: white; border: none; border-radius: 8px; font-weight: bold; font-size: 13px; }
-        .info { background: #2c3e50; padding: 15px; border-radius: 10px; width: 85vw; max-width: 350px; text-align: center; margin-top: 10px; border-bottom: 4px solid #2ecc71; }
+        .section-label { grid-column: span 2; color: #f1c40f; font-size: 0.8rem; font-weight: bold; margin-top: 5px; border-bottom: 1px solid #333; }
+        button { padding: 12px 5px; background: #34495e; color: white; border: none; border-radius: 8px; font-weight: bold; font-size: 12px; }
+        .info { background: #2c3e50; padding: 15px; border-radius: 10px; width: 85vw; max-width: 350px; text-align: center; margin-top: 10px; border-bottom: 4px solid #2ecc71; position: relative; }
         .highlight-sq { box-shadow: inset 0 0 10px 5px #f1c40f !important; }
-        #status-pill { background: #27ae60; padding: 2px 10px; border-radius: 10px; font-size: 12px; margin-bottom: 5px; display: inline-block; }
+        #status-pill { background: #27ae60; padding: 2px 10px; border-radius: 10px; font-size: 11px; margin-bottom: 5px; display: inline-block; }
+        #hint-btn { background: #8e44ad; grid-column: span 2; margin-top: 10px; padding: 15px; }
     </style>
 </head>
 <body>
 
-    <h2 style="color:#f1c40f; margin: 10px 0 5px 0;">♟️ Gambit Master</h2>
+    <h2 style="color:#f1c40f; margin: 10px 0 5px 0;">♟️ Gambit & Endgame Pro</h2>
     
     <div id="board"></div>
 
@@ -28,10 +30,16 @@
     </div>
 
     <div class="controls">
-        <button onclick="loadLevel('evans_attack')">Evans Attack</button>
-        <button onclick="loadLevel('evans_defend')">Evans Defend</button>
-        <button onclick="loadLevel('morra_attack')">Morra Attack</button>
-        <button onclick="loadLevel('morra_defend')">Morra Defend</button>
+        <div class="section-label">OPENING GAMBITS</div>
+        <button onclick="loadLevel('evans_attack')">Evans (Attack)</button>
+        <button onclick="loadLevel('evans_defend')">Evans (Defend)</button>
+        <button onclick="loadLevel('morra_attack')">Morra (Attack)</button>
+        <button onclick="loadLevel('morra_defend')">Morra (Defend)</button>
+        
+        <div class="section-label">MID & ENDGAME DRILLS</div>
+        <button onclick="loadLevel('mate_rook')">King+Rook Mate</button>
+        <button onclick="loadLevel('pawn_race')">Pawn Race</button>
+        <button id="hint-btn" onclick="getAIHint()">💡 ASK COACH FOR BEST MOVE</button>
     </div>
 
     <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
@@ -44,22 +52,24 @@
         var moveIndex = 0;
         var currentLevel = 'evans_attack';
         var sourceSquare = null;
-        var isAAMode = false; // AI Active Mode
+        var isAAMode = false; 
 
-        // Stockfish Worker
         var sf = new Worker('https://cdnjs.cloudflare.com/ajax/libs/stockfish.js/10.0.2/stockfish.js');
 
         const data = {
-            'evans_attack': { side: 'w', moves: ["e4", "e5", "Nf3", "Nc6", "Bc4", "Bc5", "b4"], hints: ["e4", "Nf3", "Bc4", "b4!"] },
-            'evans_defend': { side: 'b', moves: ["e4", "e5", "Nf3", "Nc6", "Bc4", "Bc5", "b4", "Bxb4", "c3", "Be7", "d4", "Na5"], hints: ["e5", "Nc6", "Bc5", "Bxb4", "Be7", "Na5!"] },
-            'morra_attack': { side: 'w', moves: ["e4", "c5", "d4", "cxd4", "c3"], hints: ["e4", "d4", "c3!"] },
-            'morra_defend': { side: 'b', moves: ["e4", "c5", "d4", "cxd4", "c3", "dxc3", "Nxc3", "Nc6", "Nf3", "e6", "Bc4", "Qc7", "O-O", "Nf6", "Qe2", "Ng4"], hints: ["c5", "dxc3", "Nc6", "e6", "Qc7", "Nf6", "Ng4!"] }
+            'evans_attack': { side: 'w', type: 'lesson', moves: ["e4", "e5", "Nf3", "Nc6", "Bc4", "Bc5", "b4"], hints: ["e4", "Nf3", "Bc4", "b4!"] },
+            'evans_defend': { side: 'b', type: 'lesson', moves: ["e4", "e5", "Nf3", "Nc6", "Bc4", "Bc5", "b4", "Bxb4", "c3", "Be7", "d4", "Na5"], hints: ["e5", "Nc6", "Bc5", "Bxb4", "Be7", "Na5!"] },
+            'morra_attack': { side: 'w', type: 'lesson', moves: ["e4", "c5", "d4", "cxd4", "c3"], hints: ["e4", "d4", "c3!"] },
+            'morra_defend': { side: 'b', type: 'lesson', moves: ["e4", "c5", "d4", "cxd4", "c3", "dxc3", "Nxc3", "Nc6", "Nf3", "e6", "Bc4", "Qc7", "O-O", "Nf6", "Qe2", "Ng4"], hints: ["c5", "dxc3", "Nc6", "e6", "Qc7", "Nf6", "Ng4!"] },
+            // ENDGAME DRILLS (AI starts immediately)
+            'mate_rook': { side: 'w', type: 'ai', fen: '8/8/8/8/8/3k4/8/3KR3 w - - 0 1', msg: "Box the King to the edge!" },
+            'pawn_race': { side: 'w', type: 'ai', fen: '8/4k3/8/8/8/4P3/8/4K3 w - - 0 1', msg: "Can your pawn reach the end?" }
         };
 
         function handleMove(square) {
             if (sourceSquare === null) {
                 let piece = game.get(square);
-                if (piece && piece.color === (isAAMode ? game.turn() : data[currentLevel].side)) {
+                if (piece && piece.color === game.turn()) {
                     sourceSquare = square;
                     $('.square-' + square).addClass('highlight-sq');
                 }
@@ -68,22 +78,22 @@
 
             let move = game.move({ from: sourceSquare, to: square, promotion: 'q' });
             $('.square-' + sourceSquare).removeClass('highlight-sq');
-            let oldSource = sourceSquare;
             sourceSquare = null;
 
             if (move === null) return;
 
-            // LESSON LOGIC
-            if (!isAAMode) {
+            board.position(game.fen());
+
+            // Check if Lesson Mode or AI Mode
+            if (!isAAMode && data[currentLevel].type === 'lesson') {
                 let expected = data[currentLevel].moves[moveIndex];
                 if (move.san !== expected) {
                     game.undo();
-                    alert("Not the Gambit move! Try " + expected);
+                    alert("Not the right move. Coach says: " + expected);
+                    board.position(game.fen());
                     return;
                 }
                 moveIndex++;
-                board.position(game.fen());
-                
                 if (moveIndex < data[currentLevel].moves.length) {
                     setTimeout(() => {
                         game.move(data[currentLevel].moves[moveIndex]);
@@ -92,24 +102,22 @@
                         updateHint();
                     }, 600);
                 } else {
-                    switchToAI();
+                    startAI();
                 }
             } else {
-                // AI LOGIC
-                board.position(game.fen());
                 if (!game.game_over()) {
                     $('#coach-msg').text("AI is thinking...");
                     askStockfish();
                 } else {
-                    $('#coach-msg').text("Game Over!");
+                    checkGameOver();
                 }
             }
         }
 
-        function switchToAI() {
+        function startAI() {
             isAAMode = true;
-            $('#status-pill').text("AI MODE ACTIVE").css('background', '#e67e22');
-            $('#coach-msg').text("Lesson learned! Now try to win the game.");
+            $('#status-pill').text("AI ACTIVE").css('background', '#e67e22');
+            $('#coach-msg').text("Finish the game! Good luck.");
             if (game.turn() !== data[currentLevel].side) askStockfish();
         }
 
@@ -122,39 +130,63 @@
                     game.move(move, {sloppy: true});
                     board.position(game.fen());
                     $('#coach-msg').text("Your turn!");
-                    if (game.game_over()) $('#coach-msg').text("Checkmate! Game over.");
+                    checkGameOver();
                 }
             };
         }
 
+        function getAIHint() {
+            $('#coach-msg').text("Coach is analyzing...");
+            sf.postMessage('position fen ' + game.fen());
+            sf.postMessage('go depth 15');
+            sf.onmessage = function(e) {
+                if (e.data.includes('bestmove')) {
+                    let best = e.data.split(' ')[1];
+                    let from = best.substring(0, 2);
+                    $('.square-' + from).addClass('highlight-sq');
+                    $('#coach-msg').text("Coach suggests moving: " + from);
+                    setTimeout(() => $('.square-' + from).removeClass('highlight-sq'), 2000);
+                }
+            };
+        }
+
+        function checkGameOver() {
+            if (game.in_checkmate()) $('#coach-msg').text("Checkmate! Incredible work!");
+            if (game.in_draw()) $('#coach-msg').text("It's a draw!");
+        }
+
         function updateHint() {
             let hIdx = Math.floor(moveIndex / 2);
-            if(data[currentLevel].hints[hIdx]) $('#coach-msg').text("Goal: " + data[currentLevel].hints[hIdx]);
+            if(data[currentLevel].hints && data[currentLevel].hints[hIdx]) $('#coach-msg').text("Goal: " + data[currentLevel].hints[hIdx]);
         }
 
         function loadLevel(key) {
-            currentLevel = key; moveIndex = 0; isAAMode = false; sourceSquare = null;
+            currentLevel = key; moveIndex = 0; sourceSquare = null;
             game.reset();
-            $('#status-pill').text("LESSON MODE").css('background', '#27ae60');
+            if (data[key].type === 'ai') {
+                game.load(data[key].fen);
+                isAAMode = true;
+                $('#status-pill').text("AI DRILL").css('background', '#e67e22');
+                $('#coach-msg').text(data[key].msg);
+            } else {
+                isAAMode = false;
+                $('#status-pill').text("LESSON MODE").css('background', '#27ae60');
+                updateHint();
+            }
             board.orientation(data[key].side === 'w' ? 'white' : 'black');
-            board.position('start');
-            updateHint();
-            if (data[key].side === 'b') {
+            board.position(game.fen());
+            if (data[key].side === 'b' && data[key].type === 'lesson') {
                 game.move(data[key].moves[0]);
                 moveIndex = 1;
-                board.position('start'); // force visual reset
-                setTimeout(() => board.position(game.fen()), 100);
-                updateHint();
+                board.position(game.fen());
             }
         }
 
         board = Chessboard('board', {
-            draggable: false, // Disables the disruptive "ghost" dragging
-            position: 'start',
+            draggable: false, position: 'start',
             pieceTheme: 'https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png'
         });
 
-        // Use touchstart for instant response
         $('#board').on('touchstart click', '.square-55d63', function(e) {
             e.preventDefault();
             handleMove($(this).attr('data-square'));
